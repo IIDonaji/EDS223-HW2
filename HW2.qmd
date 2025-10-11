@@ -1,0 +1,50 @@
+---
+title: "Homework Assignment 2"
+author: "Ixel"
+format: pdf
+editor: visual
+---
+
+## Exploring patterns of environmental justice
+
+#### Set Up
+
+```{r}
+# Librarys
+rm(list = ls()) # whats this for?
+library(sf) # for vector data 
+library(stars) # for raster data 
+library(tmap) # for static and interactive maps
+library(here)
+library(spData) # preloaded spatial data what does that mean?
+library(tidyverse)
+```
+
+```{r}
+# spatial data objest to plot
+
+# raster of global elevations
+ejscreen <- read_sf(here("data/ejscreen/EJSCREEN_2023_BG_StatePct_with_AS_CNMI_GU_VI.gdb",))
+
+# country boundaries
+... <- read_sf(here("data",))
+
+# major cities
+...  <- read_sf(here("data",))
+```
+
+
+#### Part 1: Legacy of redlining in current environmental (in)justice
+ 
+Exploring historical redlining in Los Angeles and its legacy on present-day environmental justice.
+ 
+map of historical redlining neighborhoods, including:
+- neighborhoods colored by HOLC grade
+- an appropriate base map
+- a clear title and legend
+ 
+```{r}
+
+```
+
+Part 2: Legacy of redlining in biodiversity observations
