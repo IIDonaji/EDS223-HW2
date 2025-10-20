@@ -13,12 +13,9 @@ Learning outcomes:
 ```
 ├───data
 │   ├───ejscreen
-│   │   └───EJSCREEN_2023_BG_StatePct_with_AS_CNMI_GU_VI.gd
+│   │   └───EJSCREEN_2023_BG_StatePct_with_AS_CNMI_GU_VI.gdb
 │   ├───gbif-birds-LA
 │   └───mapping-inequality
-├───HW2_files
-│   ├───figure-pdf
-│   └───mediabag
 └───__MACOSX
     └───data
         ├───ejscreen
