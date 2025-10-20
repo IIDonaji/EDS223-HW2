@@ -1,36 +1,79 @@
 ---
 title: "Homework Assignment 2"
 author: "Ixel"
-format: pdf
-editor: visual
+format: 
+  pdf:
+    code-fold: false
+execute:
+  message: false
+editor: 
+  markdown: 
+    wrap: sentence
+editor_options:
+  chunk_output_type: console
+date: "10/19/2025"
 ---
 
 ## Exploring patterns of environmental justice
 
 #### Set Up
 
-```{r}
-# Librarys
-rm(list = ls()) # whats this for?
+```{r, message=FALSE}
+
+# Librarys used to complete this homework
+
 library(sf) # for vector data 
-library(stars) # for raster data 
 library(tmap) # for static and interactive maps
 library(here)
-library(spData) # preloaded spatial data what does that mean?
+library(spData) 
 library(tidyverse)
+library(dplyr)
+library(gt)
+library(viridis)
+
 ```
 
+```{r, message = FALSE}
+# Spatial data object to plot
+
+# EJScreen 
+ejscreen <- st_read(here("data/ejscreen/EJSCREEN_2023_BG_StatePct_with_AS_CNMI_GU_VI.gdb"))
+
+# HOLC Redlining
+ holc <- st_read(here("data/mapping-inequality/mapping-inequality-los-angeles.json"))
+ 
+# Biodiversity observations: Bird data
+birds <- st_read(here("data/gbif-birds-LA/gbif-birds-LA.shp"))
+```
+Checking if CRS matches
+
 ```{r}
-# spatial data objest to plot
+# Stop if CRS is missing
+if(is.na(st_crs(ejscreen))) stop("EJScreen is missing CRS, assign before continuing.")
+if (is.na(st_crs(holc))) stop("HOLC is missing CRS, assign before continuing")
+if (is.na(st_crs(holc))) stop("Birds is missing CRS, assing before continuing")
+  
+# Warning if CRS mismatch. Then transform to EJScreen's CRS
+if (st_crs(holc) != st_crs(ejscreen)) {
+  warning("CRS mistmatch detected: trnasforming HOLC to match EJScreen.")
+  holc <- st_transform(holc, st_crs(ejscreen))
+}
 
-# raster of global elevations
-ejscreen <- read_sf(here("data/ejscreen/EJSCREEN_2023_BG_StatePct_with_AS_CNMI_GU_VI.gdb",))
+if (st_crs(birds) != st_crs(ejscreen)) {
+  warning("CRS mismatch detected: transforming birds to match ejscreen.")
+}
+```
 
-# country boundaries
-... <- read_sf(here("data",))
+Checking if holc, bird and ejscreen CRS match.
 
-# major cities
-...  <- read_sf(here("data",))
+```{r}
+if(st_crs(holc) == st_crs(ejscreen) &&
+   st_crs(birds) == st_crs(ejscreen)) {
+  
+  print("CRS match confirmed for holc,birds, and ejscreen.")
+} else {
+    print("CRS does not a match")
+  }
 ```
 
 
@@ -38,13 +81,161 @@ ejscreen <- read_sf(here("data/ejscreen/EJSCREEN_2023_BG_StatePct_with_AS_CNMI_G
  
 Exploring historical redlining in Los Angeles and its legacy on present-day environmental justice.
  
-map of historical redlining neighborhoods, including:
+1. Map of historical redlining neighborhoods, including:
 - neighborhoods colored by HOLC grade
 - an appropriate base map
 - a clear title and legend
- 
+
 ```{r}
+
+tmap_mode("plot")
+
+tm_shape(holc) +
+  tm_polygons(
+    col = "grade",
+    palette = c("darkgreen", "blue", "orange", "red"),
+    title = "HOLC GRADE"
+  ) +
+  tm_layout(
+    main.title = "Historical Redlining in Los Angeles",
+    main.title.position = 'center',
+    main.title.size = 1.5,
+    legend.outside = TRUE
+  ) + 
+  tm_scale_bar(position = c("left", "bottom")) +
+  tm_compass(position = c("right", "top")) +
+  tm_basemap("OpenStreetMap") 
+  
+
+```
+2.  Spatial join and summary table
+Assign census block group in ejscreen to the HOLC grade it falls inside.
+- Performed a spatial join to assign each bird observation to an HOLC grade polygon 
+- `st_join()` method will be used here because we want polygon attributes
+
+```{r}
+# Assign HOLC grade to each census block group
+
+ej_holc <- st_join(ejscreen, holc['grade'])
+
+# Drop geometry after join for table and statistics
+
+ej_holc_df <- st_drop_geometry(ej_holc)
+
+# summary table: % in each HOLC grade plus % with no grade
+
+grade_summary <- ej_holc_df %>% 
+  mutate(has_grade = !is.na(grade), "None", grade) %>% 
+  group_by(grade) %>% 
+  summarise(n =n()) %>% 
+  ungroup() %>% 
+  mutate(
+    pct = n /sum(n) * 100
+  )
+
+# Table summary
+grade_summary %>%  gt() %>%  tab_header("Percentage of Block Groups by HOLC Grade")
+```
+
+3. Summary statistics and visualization summaries
+```{r}
+# Compute means by HOLC grade
+
+ej_mean_grade <- ej_holc_df %>% 
+  group_by(grade) %>% 
+  summarise(
+    mean_low_income = mean(LOWINCPCT, na.rm = TRUE),
+    mean_pm25 = mean(P_PM25, na.rm = TRUE),
+    mean_lifeexp = mean(LIFEEXPPCT, na.rm = TRUE)
+  ) %>% 
+  
+# print(ej_mean_grade) checking results
+  
+pivot_longer(
+    cols = c(mean_low_income, mean_pm25, mean_lifeexp),
+    names_to = "variable",
+    values_to = "mean_value"
+)
+
+
+# Creating a faceted ggplot
+
+ggplot(ej_mean_grade, aes(x = grade, y = mean_value, fill = grade)) +
+  geom_col() +
+  facet_wrap( ~ variable, scales = 'free_y') +
+  labs(
+  title = "Mean EJScreen Variables by HOLC Grade",
+  x = "HOLC Grade",
+  y = "Mean Value",
+  fill = "HOLC Grade"
+  ) +
+  theme_minimal() +
+  theme(
+    strip.text = element_text(size = 12, face = "bold"),
+    axis.text.x = element_text(angle = 0, hjust = 0.5),
+    plot.title = element_text(size = 14, face = "bold")
+  )
+```
+4. Reflection paragraph
+
+Historical redlining in Los Angeles show continuous existence environmental and socioeconomic disparities. Census block groups located in formerly redlining neighborhoods, HOLC grade D and C,  have high percentages of low_income residents, elevated particular matter (PM 2.5) exposure, and lower life expectancy percentage compared to areas with high historical grades (A or B). This pattern suggest that discrimination continues to shape environmental justice outcomes, while correlation does not imply causation, these observations align with literature demonstrating that historic housing redlining influences inequalities in exposure to pollution and socioeconomic vulnerability.  
+
+
+
+
+Part 2: Legacy of redlining in biodiversity observations
+
+Exploring the legacy of historical redlining in Los Angeles on the collection of bird observations from 2021-2023.
+
+1. Percent observation summary of redlining neighborhoods within each HOLC grade.
+
+```{r}
+# Assigning each bird observation to a HOLC grade
+birds_holc <- st_join(birds, holc["grade"])
+
+# Replacing NA grades with "None"
+birds_holc <-  birds_holc %>% 
+  mutate(grades = ifelse(is.na(grade), "None", grade))
+```
+
+3. Bird observation per HOLC grade percent (%) summery.  
+
+```{r}
+bird_summary <- birds_holc %>% 
+  st_drop_geometry() %>% 
+  group_by(grade) %>% 
+  summarise(n =n()) %>% 
+  ungroup() %>% 
+  mutate(pct = n/ sum(n) * 100)
+
+print(bird_summary)
 
 ```
 
-Part 2: Legacy of redlining in biodiversity observations
+4. Visualization
+
+```{r}
+
+# Changing label for NA grades so it doesnt show "NA" in the plot
+
+bird_summary <- bird_summary %>% 
+  mutate(grade = ifelse(is.na(grade), "Outside HOLC", grade))
+
+# Graph 2.
+ggplot(bird_summary, aes(x = grade, y = pct, fill = grade)) +
+  geom_col(show.legend = FALSE) +
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) + # format y-axis to display % instead of raw numbers
+   scale_fill_viridis_d() +
+  labs(
+    title = "Percentage of Birds Observations by HOLC Grade (2021-2023)",
+    x = "HOLC Grade",
+    y = "Percent of Observations"
+  ) +
+  theme_minimal(base_size = 14)
+
+```
+
+
+5. Reflection 
+
+The results show that most bird observations occurred outside historically redlining areas. Those observation that do fall withing HOLC graded neighborhoods, Grade C contained the highest share at 3.72%, following Grade A and D at 2.35 % each, and Grade B at 1.88%. Unlike Ellis-Soto et al. (2023), we do not observe a clear gradient of reduced biodiversity observations in formerly redlining areas because here we only focused on a small geographic scale, LA county while Ellis_Soto study accounted for a larger geographic scale, 38 states. 
